@@ -1,1 +1,17 @@
-
+create an append structure, e.g. ZZACCIT_EXTENSION,and append it to standard structure ACCIT.
+In the standard system, some fields of business frontend are not transported to ACCIT,
+but we may need this fields, so we append an strucute to ACCIT.
+Fields of structure, e.g. Standard fields or Customer ZZ-fields
+LGORT:Storage Location
+CHARG:Batch Number
+GRUND:Reason for Movement
+VGBEL:Document number of the reference document
+VGPOS:Item number of the reference item
+VGTYP:Document category of preceding SD document
+ZZ_FIELD1: Customer field1
+ZZ_FIELD2: Customer field2
+...
+...
+...
+all the above fields are from business frontend, for example mm/sd, 
+so we also need do some other enhancements to let the value of these fileds are transported to ACCIT.
