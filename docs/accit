@@ -15,3 +15,17 @@ ZZ_FIELD2: Customer field2
 ...
 all the above fields are from business frontend, for example mm/sd, 
 so we also need do some other enhancements to let the value of these fileds are transported to ACCIT.
+
+1. MM GoodsMovement
+
+
+2. MM Invoice
+
+
+3. SD GoodsMovement
+
+
+4. SD Billing
+*&  desc  : SD-FI-VF01/VF02, SD Billing to FI acc, Customer Exit
+*&  CMOD  : Project-> Zxxxxxxx, for more information,
+*&          refer to SMOD, search 'SDVFX*'
