@@ -1,3 +1,306 @@
 *" Enh. Impl. for Line Items, TCODE: FAGLL03
 search SAP notes
 
+  METHOD if_ex_fagl_items_ch_data~change_items.
+
+*" Enh. Impl. for Line Items, TCODE: FAGLL03
+
+*" 科目
+    TYPES: BEGIN OF ty_hkont,
+             hkont TYPE hkont,
+             txt20 TYPE skat-txt20,
+           END OF ty_hkont.
+
+*" 利润中心
+    TYPES: BEGIN OF ty_prctr,
+             prctr TYPE prctr,
+             ktext TYPE cepct-ktext,
+           END OF ty_prctr.
+
+*" 订单
+    TYPES: BEGIN OF ty_aufnr,
+             aufnr TYPE aufk-aufnr,
+             ktext TYPE aufk-ktext,
+           END OF ty_aufnr.
+*" 客户
+    TYPES: BEGIN OF ty_kunnr,
+             kunnr TYPE kunnr,
+             ktokd TYPE ktokd,
+             name1 TYPE kna1-name1,
+             txt30 TYPE t077x-txt30,
+           END OF ty_kunnr.
+
+*" 供应商
+    TYPES: BEGIN OF ty_lifnr,
+             lifnr TYPE lifnr,
+             ktokk TYPE ktokk,
+             name1 TYPE lfa1-name1,
+             txt30 TYPE t077y-txt30,
+           END OF ty_lifnr.
+
+*" 销售合同信息， only for customer
+    TYPES: BEGIN OF ty_sales_contr,
+             contr TYPE ztsd005-cvbeln,
+             extnr TYPE ztsd005-extvbeln,
+             vkorg TYPE vkorg,
+             sdabw TYPE ztsd005-sdabw,     " 包装方式
+           END OF ty_sales_contr.
+
+    DATA: lt_hkont_temp TYPE STANDARD TABLE OF ty_hkont,
+          lt_hkont      TYPE STANDARD TABLE OF ty_hkont,
+          ls_hkont      TYPE ty_hkont.
+
+    DATA: lt_prctr_temp TYPE STANDARD TABLE OF ty_prctr,
+          lt_prctr      TYPE STANDARD TABLE OF ty_prctr,
+          ls_prctr      TYPE ty_prctr.
+
+    DATA: lt_aufnr_temp TYPE STANDARD TABLE OF ty_aufnr,
+          lt_aufnr      TYPE STANDARD TABLE OF ty_aufnr,
+          ls_aufnr      TYPE ty_aufnr.
+
+    DATA: lt_kunnr_temp TYPE STANDARD TABLE OF ty_kunnr,
+          lt_kunnr      TYPE STANDARD TABLE OF ty_kunnr,
+          ls_kunnr      TYPE ty_kunnr.
+
+    DATA: lt_lifnr_temp TYPE STANDARD TABLE OF ty_lifnr,
+          lt_lifnr      TYPE STANDARD TABLE OF ty_lifnr,
+          ls_lifnr      TYPE ty_lifnr.
+
+    DATA: lt_sales_contr_temp TYPE STANDARD TABLE OF ty_sales_contr,
+          lt_sales_contr      TYPE STANDARD TABLE OF ty_sales_contr,
+          ls_sales_contr      TYPE ty_sales_contr.
+
+    DATA: lv_gkont TYPE bseg-hkont,
+          lv_koart TYPE bseg-koart.
+
+    FIELD-SYMBOLS: <fs_u_field> TYPE any.
+
+*" use field-symbols: improve the performance
+    FIELD-SYMBOLS: <fs_item>  TYPE LINE OF faglposx_t.
+
+      LOOP AT ct_items ASSIGNING <fs_item>.
+        ls_hkont-hkont  = <fs_item>-hkont.
+        APPEND ls_hkont TO lt_hkont_temp.
+
+        ls_prctr-prctr  = <fs_item>-prctr.
+        APPEND ls_prctr TO lt_prctr_temp.
+
+        ls_aufnr-aufnr  = <fs_item>-aufnr.
+        APPEND ls_aufnr TO lt_aufnr_temp.
+
+*" U开头的字段, 并不是SAP的标准字段，而是顾问配置出来的,
+*" 如果顾问取消了配置, 这里就会报错
+*" 字段U_KUNNR、U_LIFNR
+*      ls_kunnr-kunnr  = <fs_item>-kunnr. " G/L Account Line Item 中，KUNNR和LIFNR只没有值的
+        ASSIGN COMPONENT 'U_KUNNR' OF STRUCTURE <fs_item> TO <fs_u_field>.
+        IF sy-subrc = 0.
+          ls_kunnr-kunnr  = <fs_u_field>.
+          APPEND ls_kunnr TO lt_kunnr_temp.
+        ENDIF.
+
+*      ls_lifnr-lifnr  = <fs_item>-lifnr. " G/L Account Line Item 中，KUNNR和LIFNR只没有值的
+        ASSIGN COMPONENT 'U_LIFNR' OF STRUCTURE <fs_item> TO <fs_u_field>.
+        IF sy-subrc = 0.
+          ls_lifnr-lifnr  = <fs_u_field>. " <fs_item>-u_lifnr.
+        ENDIF.
+        APPEND ls_lifnr TO lt_lifnr_temp.
+
+      ENDLOOP.
+      UNASSIGN <fs_item>.
+
+*" get text description
+      SORT lt_hkont_temp ASCENDING.
+      DELETE ADJACENT DUPLICATES FROM lt_hkont_temp.
+
+      SORT lt_prctr_temp ASCENDING.
+      DELETE ADJACENT DUPLICATES FROM lt_prctr_temp.
+
+      SORT lt_aufnr_temp ASCENDING.
+      DELETE ADJACENT DUPLICATES FROM lt_aufnr_temp.
+
+      IF lines( lt_hkont_temp ) > 0.
+        SELECT
+          saknr AS hkont
+          txt20
+          INTO TABLE lt_hkont
+          FROM skat
+            FOR ALL ENTRIES IN lt_hkont_temp
+          WHERE spras = sy-langu
+            AND ktopl = 'XXXX'
+            AND saknr = lt_hkont_temp-hkont.
+
+        SORT lt_hkont ASCENDING BY hkont.
+      ENDIF.
+
+      IF lines( lt_prctr_temp ) > 0.
+        SELECT
+          prctr
+          ktext
+          INTO TABLE lt_prctr
+          FROM cepct
+            FOR ALL ENTRIES IN lt_prctr_temp
+          WHERE spras = sy-langu
+            AND prctr = lt_prctr_temp-prctr
+            AND datbi >= sy-datum
+            AND kokrs = 'XXXX'.
+
+        SORT lt_prctr ASCENDING BY prctr.
+      ENDIF.
+
+      IF lines( lt_aufnr_temp ) > 0.
+        SELECT
+          aufnr
+          ktext
+          INTO TABLE lt_aufnr
+          FROM aufk
+            FOR ALL ENTRIES IN lt_aufnr_temp
+          WHERE aufnr = lt_aufnr_temp-aufnr.
+
+        SORT lt_aufnr ASCENDING BY aufnr.
+      ENDIF.
+
+      SORT lt_kunnr_temp ASCENDING BY kunnr.
+      DELETE ADJACENT DUPLICATES FROM lt_kunnr_temp COMPARING kunnr.
+      IF lines( lt_kunnr_temp ) > 0.
+        SELECT
+          kna1~kunnr
+          kna1~ktokd
+          kna1~name1
+          t077x~txt30
+          INTO TABLE lt_kunnr
+          FROM kna1
+            INNER JOIN t077x ON t077x~ktokd = kna1~ktokd
+                            AND t077x~spras = sy-langu
+            FOR ALL ENTRIES IN lt_kunnr_temp
+          WHERE kunnr = lt_kunnr_temp-kunnr.
+
+        SORT lt_kunnr ASCENDING BY kunnr.
+      ENDIF.
+
+      SORT lt_lifnr_temp ASCENDING BY lifnr.
+      DELETE ADJACENT DUPLICATES FROM lt_lifnr_temp COMPARING lifnr.
+      IF lines( lt_lifnr_temp ) > 0.
+        SELECT
+          lfa1~lifnr
+          lfa1~ktokk
+          lfa1~name1
+          t077y~txt30
+          INTO TABLE lt_lifnr
+          FROM lfa1
+            INNER JOIN t077y ON t077y~ktokk = lfa1~ktokk
+                            AND t077y~spras = sy-langu
+            FOR ALL ENTRIES IN lt_lifnr_temp
+          WHERE lifnr = lt_lifnr_temp-lifnr.
+
+        SORT lt_lifnr ASCENDING BY lifnr.
+      ENDIF.
+
+
+
+*" fill additional fields
+      LOOP AT ct_items ASSIGNING <fs_item>.
+
+*" 科目
+        READ TABLE lt_hkont INTO ls_hkont WITH KEY hkont = <fs_item>-hkont BINARY SEARCH.
+        IF sy-subrc = 0.
+          <fs_item>-zz_hkont_text = ls_hkont-txt20.
+        ENDIF.
+
+*" 利润中心
+        READ TABLE lt_prctr INTO ls_prctr WITH KEY prctr = <fs_item>-prctr BINARY SEARCH.
+        IF sy-subrc = 0.
+          <fs_item>-zz_prctr_text = ls_prctr-ktext.
+        ENDIF.
+
+*" 订单
+        READ TABLE lt_aufnr INTO ls_aufnr WITH KEY aufnr = <fs_item>-aufnr BINARY SEARCH.
+        IF sy-subrc = 0.
+          <fs_item>-zz_aufnr_text = ls_aufnr-ktext.
+        ENDIF.
+
+*" 客户
+        READ TABLE lt_kunnr INTO ls_kunnr WITH KEY kunnr = <fs_item>-kunnr BINARY SEARCH.
+        IF sy-subrc = 0.
+          <fs_item>-zz_kunnr_text = ls_kunnr-name1.
+          <fs_item>-zz_ktokd      = ls_kunnr-ktokd.
+          <fs_item>-zz_ktokd_text = ls_kunnr-txt30.
+        ENDIF.
+
+        " 供应商
+        READ TABLE lt_lifnr INTO ls_lifnr WITH KEY lifnr = <fs_item>-lifnr BINARY SEARCH.
+        IF sy-subrc = 0.
+          <fs_item>-zz_lifnr_text = ls_lifnr-name1.
+          <fs_item>-zz_ktokk      = ls_lifnr-ktokk.
+          <fs_item>-zz_ktokk_text = ls_lifnr-txt30.
+        ENDIF.
+
+        "*@TO-DO 待确认 总账行项目是否需要客户/供应商,
+*"以及原<FS_ITEM>-kunnr, <fs_item>-lifnr是否有值, 若没有值，则 get_gkont
+        CALL FUNCTION 'GET_GKONT'
+          EXPORTING
+            belnr           = <fs_item>-belnr
+            bukrs           = <fs_item>-bukrs
+            buzei           = <fs_item>-buzei
+            gjahr           = <fs_item>-gjahr
+            gknkz           = '3'
+          IMPORTING
+            gkont           = lv_gkont
+            koart           = lv_koart
+*           GHKON           =
+          EXCEPTIONS
+            belnr_not_found = 1
+            buzei_not_found = 2
+            gknkz_not_found = 3
+            OTHERS          = 4.
+        IF sy-subrc <> 0.
+* Implement suitable error handling here
+        ELSE.
+          IF lv_koart EQ 'D' AND <fs_item>-kunnr IS INITIAL.  " Customer
+            <fs_item>-gkont = lv_gkont.
+            <fs_item>-gkart = lv_koart.
+            <fs_item>-kunnr = lv_gkont.
+            me->get_customer_name(
+              EXPORTING
+                i_kunnr = <fs_item>-kunnr
+              IMPORTING
+                e_name1 = <fs_item>-zz_kunnr_text
+                e_ktokd = <fs_item>-zz_ktokd
+                e_ktokd_text  = <fs_item>-zz_ktokd_text ).
+          ENDIF.
+
+          IF lv_koart EQ 'K' AND <fs_item>-kunnr IS INITIAL.  " Vendor
+            <fs_item>-gkont = lv_gkont.
+            <fs_item>-gkart = lv_koart.
+            <fs_item>-lifnr = lv_gkont.
+            me->get_vendor_name(
+              EXPORTING
+                i_lifnr = <fs_item>-lifnr
+              IMPORTING
+                e_name1 = <fs_item>-zz_lifnr_text
+                e_ktokk = <fs_item>-zz_ktokk
+                e_ktokk_text  = <fs_item>-zz_ktokk_text ).
+          ENDIF.
+        ENDIF.
+
+*" 销售合同 ZTABLE
+
+        CLEAR: lv_gkont, lv_koart.
+      ENDLOOP.
+
+      UNASSIGN <fs_item>.
+      FREE:
+      lt_hkont_temp,
+      lt_hkont     ,
+      lt_prctr_temp,
+      lt_prctr     ,
+      lt_aufnr_temp,
+      lt_aufnr     ,
+      lt_kunnr_temp,
+      lt_kunnr     ,
+      lt_lifnr_temp,
+      lt_lifnr     ,
+      lt_sales_contr_temp,
+      lt_sales_contr .
+
+
+  ENDMETHOD.
